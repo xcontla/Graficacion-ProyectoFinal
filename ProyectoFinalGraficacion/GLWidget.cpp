@@ -6,7 +6,6 @@
 #else
 #include <GL/glew.h>
 #include <QtGui/QApplication>
-#include <QtOpenGL/QGLWidget>
 #include <QtGui/QMouseEvent>
 #include <GL/glut.h>
 #include <GL/gl.h>
@@ -15,18 +14,20 @@
 
 #include "glInfo.h"
 #include <QtGlobal>
-#include <QMouseEvent>
+#include <QtGui/QMouseEvent>
 #include <QTimer>
 
 #include <iostream>
 #include <fstream>
 #include <math.h>
 #include <exception>
-#include "GLWidget.h"
 #include <math.h>
 #include <string>
+#include "GLWidget.h"
 
 using namespace std;
+
+#define PI	3.141592
 
 GLWidget::GLWidget(QWidget *parent) :QGLWidget(/*QGLFormat( QGL::AlphaChannel |
                                                           QGL::DoubleBuffer |
@@ -42,12 +43,14 @@ GLWidget::GLWidget(QWidget *parent) :QGLWidget(/*QGLFormat( QGL::AlphaChannel |
     myqtimer->start(20);
 
     setMouseTracking(true);
+    setFocusPolicy(Qt::StrongFocus);
     setAutoBufferSwap(false);
     format().setDoubleBuffer(true);
     mouseLeftDown = mouseRightDown = mouseMiddleDown = false;
     mouseX = mouseY = 0;
     cameraAngleX = cameraAngleY = 0.0f;
     cameraDistance = 25.0f;
+    cameraSpeed = 2.0;
 
 }
 
@@ -59,40 +62,13 @@ GLWidget::~GLWidget()
 
 }
 
-
-void GLWidget::setXRotation(int angle)
-{
-    normalizeAngle(&angle);
-    if (angle != xRot) {
-        xRot = angle;
-        emit xRotationChanged(angle);
-        updateGL();
-    }
-}
-
-void GLWidget::setYRotation(int angle)
-{
-    normalizeAngle(&angle);
-    if (angle != yRot) {
-        yRot = angle;
-        emit yRotationChanged(angle);
-        updateGL();
-    }
-}
-
-void GLWidget::setZRotation(int angle)
-{
-    normalizeAngle(&angle);
-    if (angle != zRot) {
-        zRot = angle;
-        emit zRotationChanged(angle);
-        updateGL();
-    }
-}
-
-
 void GLWidget::initializeGL()
 {
+
+	cameraTranslateX = 0.0f;
+	cameraTranslateX = 8.0f;
+	cameraTranslateZ = 0.0f;
+	cameraAngle = 0.0f;
 
     GLenum err = glewInit();
     if (GLEW_OK != err)
@@ -140,6 +116,22 @@ void GLWidget::initLights()
     glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
     glLightfv(GL_LIGHT0, GL_AMBIENT,ambient_light);
 
+
+    glEnable(GL_LIGHT1);
+    static const GLfloat lightPos1[4] = { 52.37f, 10.0, -30.44f, 1.0f };
+    static const GLfloat light1[4] = {1.0, 1.0, 0.5, 1.0};
+    static const GLfloat lightDirection1[3] = {0.0, -1.0, 0.0};
+    glLightfv(GL_LIGHT1, GL_POSITION, light1);
+    glLightfv(GL_LIGHT1, GL_AMBIENT,light1);
+    glLightfv(GL_LIGHT1, GL_DIFFUSE,light1);
+    glLightfv(GL_LIGHT1, GL_SPECULAR,light1);
+    glLightfv(GL_LIGHT1, GL_SPOT_DIRECTION, lightDirection1);
+    glLightf(GL_LIGHT1, GL_SPOT_CUTOFF, 75.0);
+    glLightf(GL_LIGHT1, GL_SPOT_EXPONENT, 50.0);
+    glLightf(GL_LIGHT1, GL_CONSTANT_ATTENUATION, 0.8);
+    glLightf(GL_LIGHT1, GL_LINEAR_ATTENUATION, 0.6);
+    glLightf(GL_LIGHT1, GL_QUADRATIC_ATTENUATION, 0.4);
+
     GLfloat lmodel_ambient[] = { 0.2, 0.2, 0.2, 1.0 };
     glLightModelfv(GL_LIGHT_MODEL_AMBIENT, lmodel_ambient);
     glEnable(GL_NORMALIZE);
@@ -151,32 +143,36 @@ void GLWidget::loadShaders()
     //model1 = new xcModel("../resources/dragon.ply","../Shaders/program.vert","../Shaders/program.frag");
 
     //model2 = new xcModel("../resources/bunny.ply","../Shaders/default.vert","../Shaders/default.frag"); //para shaders menores
-    model2 = new xcModel("../resources/bunny.ply","../Shaders/default.vert","../Shaders/default.frag");
-    model3 = new LoadOBJ("../resources/dragon.obj",1);
-    model3->initVBO();
-    model3->initShader("../Shaders/noise.vert","../Shaders/noise1.frag");
+    // model2 = new xcModel("../resources/bunny.ply","../Shaders/default.vert","../Shaders/default.frag");
+    // model3 = new LoadOBJ("../resources/dragon.obj",1);
+    // model3->initVBO();
+    // model3->initShader("../Shaders/noise.vert","../Shaders/noise1.frag");
 
 
 }
 
 void GLWidget::paintGL()
 {
-    glPolygonMode(GL_FRONT, GL_FILL);
-    glPolygonMode(GL_BACK, GL_LINE);
+	glPolygonMode(GL_FRONT, GL_FILL);
+	glPolygonMode(GL_BACK, GL_LINE);
+
     //GLuint tloc;
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     glClearDepth(1.0f);
     //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear color and depth buffers
+
+    glPushMatrix();
+
+    glRotatef(cameraAngle, 0.0f, 1.0f, 0.0f);
+    glTranslatef(cameraTranslateX, cameraTranslateY, cameraTranslateZ);
+
     glPushMatrix();
 
     glTranslatef(0, 0, -cameraDistance);
     glRotatef(cameraAngleX, 1, 0, 0);
     glRotatef(cameraAngleY, 0, 1, 0);
-    /*glRotated(xRot, 1.0, 0.0, 0.0);
-    glRotated(yRot, 0.0, 1.0, 0.0);
-    glRotated(zRot, 0.0, 0.0, 1.0);*/
 
 
     glPushMatrix();
@@ -215,6 +211,8 @@ void GLWidget::paintGL()
     glPopMatrix();
     glPopMatrix();
 
+    glPopMatrix();
+
     this->swapBuffers();
 
 
@@ -228,33 +226,13 @@ void GLWidget::resizeGL(int w, int h)
 
     glLoadIdentity();
     gluPerspective(45,w/h,0.01,1000);
-    gluLookAt(0.0,5.0,0.0,
-              0.0,5.0,10.0,
+    gluLookAt(0.0,8.0,10.0,
+              0.0,8.0,0.0,
               0.0,1.0,0.0);
     // glFrustum(-10.0, +10.0, -10.0, 10.0, 5.0, 60.0);
 
     // glTranslated(0.0, 0.0, -1.0);
 }
-
-/*void GLWidget::mousePressEvent(QMouseEvent *event)
-{
-    lastPos = event->pos();
-}
-
-void GLWidget::mouseMoveEvent(QMouseEvent *event)
-{
-    int dx = event->x() - lastPos.x();
-    int dy = event->y() - lastPos.y();
-
-    if (event->buttons() & Qt::LeftButton) {
-        setXRotation(xRot + 3 * dy);
-        setYRotation(yRot + 3 * dx);
-    } else if (event->buttons() & Qt::RightButton) {
-        setXRotation(xRot + 3 * dy);
-        setZRotation(zRot + 3 * dx);
-    }
-    lastPos = event->pos();
-}*/
 
 void GLWidget::normalizeAngle(int *angle)
 
@@ -264,6 +242,7 @@ void GLWidget::normalizeAngle(int *angle)
     while (*angle > 360)
         *angle -= 360;
 }
+
 void GLWidget ::idle()
 {
     timef += 0.1;
@@ -272,11 +251,11 @@ void GLWidget ::idle()
 
 void GLWidget::clearMemory()
 {
-    delete model1;
-    delete model2;
-    model3->FreeModel();
-    delete model3;
-    delete shader;
+//     delete model1;
+//     delete model2;
+//     model3->FreeModel();
+//     delete model3;
+//     delete shader;
 }
 
 void GLWidget::mouseMoveEvent(QMouseEvent *event)
@@ -297,7 +276,6 @@ void GLWidget::mouseMoveEvent(QMouseEvent *event)
 
   updateGL();
 }
-
 
 void GLWidget::mousePressEvent(QMouseEvent *event)
 {
@@ -348,7 +326,7 @@ void GLWidget::keyPressEvent(QKeyEvent* event)
 {
   switch(event->key()){
   case Qt::Key_Escape:
-    close();
+    emit exit();
     break;
   case Qt::Key_A:
     cout << mouseLeftDown << mouseRightDown << mouseMiddleDown <<endl;
@@ -359,8 +337,35 @@ void GLWidget::keyPressEvent(QKeyEvent* event)
   case Qt::Key_K:
     glDisable(GL_LIGHTING);
     break;
+  case Qt::Key_Up:
+	  cameraTranslateZ += cameraSpeed*sin((cameraAngle + 90) *PI/180.0f);
+	  cameraTranslateX += cameraSpeed*cos((cameraAngle + 90)*PI/180.0f);
+	  updateGL();
+	  break;
+  case Qt::Key_Down:
+	  cameraTranslateZ -= cameraSpeed*sin((cameraAngle + 90)*PI/180.0f);
+	  cameraTranslateX -= cameraSpeed*cos((cameraAngle + 90)*PI/180.0f);
+	  updateGL();
+  	  break;
+  case Qt::Key_Right:
+	  cameraAngle += 5;
+	  normalizeAngle(&cameraAngle);
+	  break;
+  case Qt::Key_Left:
+	  cameraAngle -= 5;
+	  normalizeAngle(&cameraAngle);
+  	  break;
+  case Qt::Key_W:
+	  cameraTranslateY -= cameraSpeed;
+	  break;
+  case Qt::Key_S:
+  	  cameraTranslateY += cameraSpeed;
+  	  break;
+  case Qt::Key_P:
+	  cout << "(" << -cameraTranslateX << ", " << -cameraTranslateZ << ")" << endl;
+	  break;
   default:
-    event->ignore();
+	  event->ignore();
     break;
   }
 

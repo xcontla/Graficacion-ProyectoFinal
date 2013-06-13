@@ -63,15 +63,13 @@ public:
     void clearMemory();
 
 public slots:
-    void setXRotation(int angle);
-    void setYRotation(int angle);
-    void setZRotation(int angle);
     void idle();
+//    void disableLights();
+//    void enableLights();
+//    void keyPressed(int);
 
 signals:
-    void xRotationChanged(int angle);
-    void yRotationChanged(int angle);
-    void zRotationChanged(int angle);
+    void exit();
 
 protected:
     void initializeGL();
@@ -80,13 +78,16 @@ protected:
     void mousePressEvent(QMouseEvent *event);
     void mouseMoveEvent(QMouseEvent *event);
     void mouseReleaseEvent(QMouseEvent *);
-    void keyPressEvent(QKeyEvent *);
+    void keyPressEvent( QKeyEvent* );
     void initLights();
     void loadShaders();
 
+    float cameraTranslateX;
+    float cameraTranslateY;
+    float cameraTranslateZ;
+    int cameraAngle;
+    float cameraSpeed;
 
-
-private slots:
 
 private:
     void normalizeAngle(int *angle);

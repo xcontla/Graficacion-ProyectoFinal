@@ -19,9 +19,15 @@ public:
 private slots:
     void on_actionClose_triggered();
 
+//signals:
+//	void disableLightsSignal();
+//	void enableLightsSignal();
+//	void keyPressedSignal(int);
+
 private:
     Ui::MainWindow *ui;
     GLWidget *glWidget;
+//    bool eventFilter(QObject*, QEvent*);
 };
 
 #endif // MAINWINDOW_H
